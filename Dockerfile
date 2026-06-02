@@ -1,10 +1,8 @@
-# ---------- BASE RUNTIME ----------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# ---------- BASE RUNTIME (small image) ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS base
 WORKDIR /app
 
-# IMPORTANT: make app listen on port 8080 inside container
 ENV ASPNETCORE_URLS=http://+:8080
-
 EXPOSE 8080
 
 
@@ -12,20 +10,26 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY ["GithubAction.csproj", "."]
-RUN dotnet restore "./GithubAction.csproj"
+# Copy only csproj first (better cache)
+COPY GithubAction.csproj ./
+RUN dotnet restore
 
-COPY . .
-RUN dotnet build "GithubAction.csproj" -c Release -o /app/build
+# Copy everything else
+COPY . ./
+
+RUN dotnet build -c Release -o /app/build
 
 
 # ---------- PUBLISH STAGE ----------
 FROM build AS publish
-RUN dotnet publish "GithubAction.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
+RUN dotnet publish -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false \
+    /p:SelfContained=false
 
-# ---------- FINAL RUNTIME IMAGE ----------
-FROM base AS final
+# ---------- FINAL RUNTIME ----------
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 WORKDIR /app
 
 COPY --from=publish /app/publish .

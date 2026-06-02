@@ -1,30 +1,56 @@
-**/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/azds.yaml
-**/bin
-**/charts
-**/docker-compose*
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
-LICENSE
+# ---------------------------
+# Git
+# ---------------------------
+.git
+.gitignore
+
+# ---------------------------
+# Visual Studio / IDE
+# ---------------------------
+.vs
+.vscode
+*.user
+*.suo
+
+# ---------------------------
+# .NET build outputs
+# ---------------------------
+bin/
+obj/
+out/
+publish/
+TestResults/
+
+# ---------------------------
+# Terraform (VERY IMPORTANT for you)
+# ---------------------------
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# ---------------------------
+# Docker / Compose
+# ---------------------------
+docker-compose*
+Dockerfile*
+
+# ---------------------------
+# Node (if any future UI added)
+# ---------------------------
+node_modules/
+
+# ---------------------------
+# Logs / secrets
+# ---------------------------
+*.log
+*.env
+secrets*.json
+
+# ---------------------------
+# Docs (optional)
+# ---------------------------
 README.md
-!**/.gitignore
-!.git/HEAD
-!.git/config
-!.git/packed-refs
-!.git/refs/heads/**
+LICENSE
