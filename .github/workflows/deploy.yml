@@ -1,4 +1,4 @@
-name: Build, Push to ECR and Deploy to ECS
+name: ECS Blue-Green Deploy
 
 on:
   push:
@@ -6,42 +6,87 @@ on:
       - master
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout code
-    - name: Checkout Code
-      uses: actions/checkout@v4
 
-    # 2. Configure AWS credentials
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    # 1. Checkout code
+    - uses: actions/checkout@v4
+
+    # 2. AWS credentials
+    - uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # 3. Login to Amazon ECR
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+    # 3. Login to ECR
+    - uses: aws-actions/amazon-ecr-login@v2
 
-    # 4. Build Docker image
-    - name: Build Docker Image
+    # 4. Build image
+    - name: Build Image
       run: |
-        docker build -t ${{ secrets.ECR_REPOSITORY }}:latest .
+        docker build -t mywebapi .
 
-    # 5. Tag Docker Image
-    - name: Tag Docker Image
+    # 5. Tag image
+    - name: Tag Image
       run: |
-        docker tag ${{ secrets.ECR_REPOSITORY }}:latest \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
+        docker tag mywebapi:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mywebapi:latest
 
-    # 6. Push Docker Image to ECR
-    - name: Push Docker Image
+    # 6. Push image
+    - name: Push Image
       run: |
-        docker push \
-        ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:latest
+        docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/mywebapi:latest
 
-    
+    # 7. Register new task definition
+    - name: Render task definition
+      id: taskdef
+      run: |
+        TASK_DEF=$(aws ecs describe-task-definition \
+          --task-definition mywebapi-task \
+          --query taskDefinition > taskdef.json)
+
+    - name: Clean task definition JSON
+      run: |
+        jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)' taskdef.json > taskdef-clean.json
+
+    - name: Register new revision
+      id: register
+      run: |
+        NEW_TASK_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://taskdef-clean.json \
+          --query "taskDefinition.taskDefinitionArn" \
+          --output text)
+
+        echo "task_arn=$NEW_TASK_ARN" >> $GITHUB_OUTPUT
+
+    # 8. Create Appspec dynamically
+    - name: Create appspec
+      run: |
+        cat > appspec.yaml <<EOF
+        version: 0.0
+        Resources:
+          - TargetService:
+              Type: AWS::ECS::Service
+              Properties:
+                TaskDefinition: ${{ steps.register.outputs.task_arn }}
+                LoadBalancerInfo:
+                  ContainerName: mywebapi-container
+                  ContainerPort: 8080
+        EOF
+
+    # 9. Upload bundle to S3 (required by CodeDeploy ECS)
+    - name: Upload bundle to S3
+      run: |
+        zip deploy.zip appspec.yaml
+        aws s3 cp deploy.zip s3://my-codedeploy-bucket/deploy.zip
+
+    # 10. Trigger CodeDeploy
+    - name: Deploy via CodeDeploy
+      run: |
+        aws deploy create-deployment \
+          --application-name mywebapi-codedeploy \
+          --deployment-group-name mywebapi-dg \
+          --revision revisionType=S3,s3Location="{bucket=my-codedeploy-bucket,key=deploy.zip,bundleType=zip}" \
+          --region ${{ secrets.AWS_REGION }}
