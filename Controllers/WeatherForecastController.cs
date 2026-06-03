@@ -26,7 +26,7 @@ namespace GithubAction.Controllers
         [HttpGet("version")]
         public IActionResult Version()
         {
-            return Ok("Application Version 2");
+            return Ok("Application Version 3");
         }
     }
 }
