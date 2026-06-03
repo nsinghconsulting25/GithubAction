@@ -22,5 +22,11 @@ namespace GithubAction.Controllers
             })
             .ToArray();
         }
+
+        [HttpGet("version")]
+        public IActionResult Version()
+        {
+            return Ok("Application Version 2");
+        }
     }
 }

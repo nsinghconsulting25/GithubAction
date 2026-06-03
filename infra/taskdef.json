@@ -1,0 +1,22 @@
+{
+  "family": "mywebapi-task",
+  "executionRoleArn": "arn:aws:iam::261358762045:role/ecsTaskExecutionRoleTf",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "mywebapi-container",
+      "image": "261358762045.dkr.ecr.us-east-1.amazonaws.com/mywebapi:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  ]
+}
